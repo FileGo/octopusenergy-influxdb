@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -58,8 +57,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	flag.Parse()
 
 	// Verify config
 	if cfg.Octopus.Token == "" {

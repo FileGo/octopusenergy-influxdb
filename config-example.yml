@@ -1,0 +1,15 @@
+octopusenergy:
+  token: "Get API Token from your Octopus Energy account"
+
+influxdb:
+  url: "http://localhost:8086"
+  database: "octopusenergy"
+  token: ""
+  
+electricity:
+  mpan: ""
+  serial: ""
+
+gas:
+  mpan: ""
+  serial: ""

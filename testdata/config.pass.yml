@@ -1,0 +1,15 @@
+octopusenergy:
+  token: "oct_token"
+
+influxdb:
+  url: "http://localhost:8086"
+  database: "octopusenergy"
+  token: "token"
+  
+electricity:
+  mpan: "12345"
+  serial: "12345"
+
+gas:
+  mpan: "12345"
+  serial: "12345"

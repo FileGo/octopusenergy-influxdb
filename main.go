@@ -11,7 +11,7 @@ import (
 
 	"github.com/FileGo/octopusenergyapi"
 	influxdb2 "github.com/influxdata/influxdb-client-go/v2"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 // Config stores program configurations
@@ -36,18 +36,19 @@ type Config struct {
 
 const configFile = "config.yml"
 
-func main() {
-	// Check if config file exists
-	_, err := os.Stat(configFile)
-	if errors.Is(err, os.ErrNotExist) {
-		// File doesn't exist
-		log.Fatal("config.yml not found")
-	}
+const (
+	fuelELEC = "electricity"
+	fuelGAS  = "gas"
+)
 
+// readConfigFile reads configuration from a file
+//
+// Returns error if file doesn't exist, file cannot be parsed or fields don't pass validation
+func readConfigFile(filename string) (*Config, error) {
 	// Open file
-	f, err := os.Open(configFile)
+	f, err := os.Open(filename)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("unable to open file %s: %v", configFile, err)
 	}
 	defer f.Close()
 
@@ -55,15 +56,55 @@ func main() {
 	decoder := yaml.NewDecoder(f)
 	err = decoder.Decode(&cfg)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("unable to parse configuration: %v", err)
 	}
 
 	// Verify config
 	if cfg.Octopus.Token == "" {
-		log.Fatal("No API key provided")
+		return nil, errors.New("API token not provided")
 	}
 	if cfg.Influx.URL == "" {
-		log.Fatal("No URL to InfluxDB provided")
+		return nil, errors.New("InfluxDB URL not provided")
+	}
+
+	return &cfg, nil
+}
+
+func getLastTime(cfg *Config, iClient influxdb2.Client, fuel string) (time.Time, error) {
+	if !(fuel == fuelELEC || fuel == fuelGAS) {
+		return time.Time{}, errors.New("incorrect fuel type")
+	}
+
+	queryAPI := iClient.QueryAPI("")
+
+	// Get latest electricity entry
+	res, err := queryAPI.Query(context.Background(), `from(bucket:"`+cfg.Influx.Database+`")
+	|> range(start: -8760h)
+	|> filter(fn: (r) =>
+		r._measurement == "`+fuel+`" and r._value != 0
+	)
+	|> last()`)
+
+	if err != nil {
+		return time.Time{}, fmt.Errorf("unable to read from database: %v", err)
+	}
+
+	// Set last time
+	var lastTime time.Time
+
+	if !res.Next() {
+		lastTime = time.Now().Add(-5 * 365 * 24 * time.Hour) // 5 years ago
+	} else {
+		lastTime = res.Record().Time()
+	}
+
+	return lastTime, nil
+}
+
+func main() {
+	cfg, err := readConfigFile(configFile)
+	if err != nil {
+		log.Fatalf("unable to read configuration file: %v", err)
 	}
 
 	var getElec, getGas bool
@@ -82,7 +123,6 @@ func main() {
 	// InfluxDB
 	iClient := influxdb2.NewClient(cfg.Influx.URL, cfg.Influx.Token)
 	writeAPI := iClient.WriteAPI("", cfg.Influx.Database)
-	queryAPI := iClient.QueryAPI("")
 
 	// Set up Octopus client
 	client, err := octopusenergyapi.NewClient(cfg.Octopus.Token, http.DefaultClient)
@@ -92,25 +132,10 @@ func main() {
 
 	if getElec {
 		// Get latest electricity entry
-		res, err := queryAPI.Query(context.Background(), `from(bucket:"`+cfg.Influx.Database+`")
-|> range(start: -8760h)
-|> filter(fn: (r) =>
-	r._measurement == "electricity" and r._value != 0
-)
-|> last()`)
-
+		lastElecTime, err := getLastTime(cfg, iClient, "electricity")
 		if err != nil {
-			log.Fatalf("Unable to read from database: %v", err)
-		}
-
-		// Set last time
-		var lastElecTime time.Time
-
-		if !res.Next() {
-			log.Println("Unable to read last entry from database, collecting data for last 5 years")
-			lastElecTime = time.Now().Add(-5 * 365 * 24 * time.Hour) // 5 years ago
-		} else {
-			lastElecTime = res.Record().Time()
+			log.Println("unable to get last record for electricity in InfluxDB, retrieving data for last 5 years")
+			lastElecTime = time.Now().Add(-5 * 365 * 24 * time.Hour)
 		}
 
 		// Get data
@@ -121,7 +146,7 @@ func main() {
 			PageSize: 1e6,
 		})
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("error reading electricity meter consumption: %v", err)
 		}
 
 		for _, row := range rows {
@@ -132,24 +157,10 @@ func main() {
 
 	if getGas {
 		// Get latest gas entry
-		res, err := queryAPI.Query(context.Background(), `from(bucket:"`+cfg.Influx.Database+`")
-|> range(start: -8760h)
-|> filter(fn: (r) =>
-	r._measurement == "gas" and r._value != 0
-)
-|> last()`)
-
+		lastGasTime, err := getLastTime(cfg, iClient, "gas")
 		if err != nil {
-			log.Fatalf("Unable to read from database: %v", err)
-		}
-
-		var lastGasTime time.Time
-
-		if !res.Next() {
-			log.Println("Unable to read last entry from database, collecting data for last 5 years")
-			lastGasTime = time.Now().Add(-5 * 365 * 24 * time.Hour) // 5 years ago
-		} else {
-			lastGasTime = res.Record().Time()
+			log.Println("unable to get last record for gas in InfluxDB, retrieving data for last 5 years")
+			lastGasTime = time.Now().Add(-5 * 365 * 24 * time.Hour)
 		}
 
 		// Get data
@@ -160,7 +171,7 @@ func main() {
 			PageSize: 1e6,
 		})
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("error reading gas meter consumption: %v", err)
 		}
 
 		for _, row := range rows {

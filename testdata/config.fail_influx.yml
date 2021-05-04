@@ -1,0 +1,5 @@
+octopusenergy:
+  token: "oct_token"
+
+influxdb:
+  url: ""

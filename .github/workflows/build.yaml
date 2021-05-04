@@ -15,16 +15,8 @@ jobs:
       with:
         go-version: ${{ matrix.version }}
 
-    - name: Install dependencies
-      run: |
-        go version
-        go get -u golang.org/x/lint/golint
+    - name: Go version
+      run: go version
 
     - name: build
       run: go build .
-
-    - name: Test with coverage
-      run: go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
-
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v1

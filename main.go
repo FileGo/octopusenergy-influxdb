@@ -21,6 +21,7 @@ type Config struct {
 	} `yaml:"octopusenergy"`
 	Influx struct {
 		URL      string `yaml:"url"`
+		Org      string `yaml:"org"`
 		Database string `yaml:"database"`
 		Token    string `yaml:"token"`
 	} `yaml:"influxdb"`
@@ -75,7 +76,7 @@ func getLastTime(cfg *Config, iClient influxdb2.Client, fuel string) (time.Time,
 		return time.Time{}, errors.New("incorrect fuel type")
 	}
 
-	queryAPI := iClient.QueryAPI("")
+	queryAPI := iClient.QueryAPI(cfg.Influx.Org)
 
 	// Get latest electricity entry
 	res, err := queryAPI.Query(context.Background(), `from(bucket:"`+cfg.Influx.Database+`")
@@ -122,7 +123,7 @@ func main() {
 
 	// InfluxDB
 	iClient := influxdb2.NewClient(cfg.Influx.URL, cfg.Influx.Token)
-	writeAPI := iClient.WriteAPI("", cfg.Influx.Database)
+	writeAPI := iClient.WriteAPI(cfg.Influx.Org, cfg.Influx.Database)
 
 	// Set up Octopus client
 	client, err := octopusenergyapi.NewClient(cfg.Octopus.Token, http.DefaultClient)

@@ -12,6 +12,7 @@ octopusenergy:
 
 influxdb:
   url: "http://localhost:8086"
+  # org: "Utilities"
   database: "octopusenergy"
   token: ""
   
@@ -24,6 +25,8 @@ gas:
   serial: "..."
 ```
 *Note: InfluxDB authorization token is optional.*
+
+*Note: Organization is required for InfluxDB v2.*
 
 If you don't wish to get electricity or gas data, just remove that part of configuration file.
 

@@ -3,6 +3,7 @@ octopusenergy:
 
 influxdb:
   url: "http://localhost:8086"
+  # org: ""
   database: "octopusenergy"
   token: ""
   

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/FileGo/octopusenergyapi"
@@ -32,6 +33,7 @@ type Config struct {
 	Gas struct {
 		MPAN   string `yaml:"mpan"`
 		Serial string `yaml:"serial"`
+		Type   string `yaml:"type"`
 	} `yaml:"gas"`
 }
 
@@ -175,8 +177,15 @@ func main() {
 			log.Fatalf("error reading gas meter consumption: %v", err)
 		}
 
+		// SMETS1 meters report kWh for gas, SMETS2 reports m3
+		// See https://developer.octopus.energy/docs/api/#consumption
+		unit := "m3"
+		if strings.ToLower(cfg.Gas.Type) == "smets1" {
+			unit = "kWh"
+		}
+
 		for _, row := range rows {
-			p := influxdb2.NewPoint("gas", map[string]string{"unit": "m3"}, map[string]interface{}{"consumption": row.Value}, row.IntervalStart)
+			p := influxdb2.NewPoint("gas", map[string]string{"unit": unit}, map[string]interface{}{"consumption": row.Value}, row.IntervalStart)
 			writeAPI.WritePoint(p)
 		}
 	}

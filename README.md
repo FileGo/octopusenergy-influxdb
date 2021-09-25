@@ -23,12 +23,16 @@ electricity:
 gas:
   mpan: "...."
   serial: "..."
+  # type: smets1
 ```
 *Note: InfluxDB authorization token is optional.*
 
 *Note: Organization is required for InfluxDB v2.*
 
 If you don't wish to get electricity or gas data, just remove that part of configuration file.
+
+`type: smets1` must be specified for SMETS1 meters to ensure correct unit for gas meter readings.
+This can be omitted for SMETS2 meters.
 
 Tested with InfluxDB v1.8.3 - compatibility with InfluxDB 2.0 not guaranteed.
 
